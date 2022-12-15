@@ -5,12 +5,18 @@
 ##################################################
 
 import os, sys
-import ConfigParser
+import argparse
+import configparser
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', type=str, required=True)
+args = parser.parse_args()
 
 
 #config file to read from
-config = ConfigParser.RawConfigParser()
-config.readfp(open(r'./configuration.txt'))
+config = configparser.RawConfigParser()
+config.readfp(open(args.config))
 #===========================================
 #name of the experiment!!
 name_experiment = config.get('experiment name', 'name')
@@ -20,7 +26,7 @@ run_GPU = '' if sys.platform == 'win32' else ' THEANO_FLAGS=device=gpu,floatX=fl
 
 #create a folder for the results if not existing already
 result_dir = name_experiment
-print "\n1. Create directory for the results (if not already existing)"
+print("\n1. Create directory for the results (if not already existing)")
 if os.path.exists(result_dir):
     pass
 elif sys.platform=='win32':
@@ -31,8 +37,8 @@ else:
 
 # finally run the prediction
 if nohup:
-    print "\n2. Run the prediction on GPU  with nohup"
-    os.system(run_GPU +' nohup python -u ./src/retinaNN_predict.py > ' +'./'+name_experiment+'/'+name_experiment+'_prediction.nohup')
+    print("\n2. Run the prediction on GPU  with nohup")
+    os.system(run_GPU + f' nohup python -u ./src/retinaNN_predict.py --config {args.config}> ' +'./'+name_experiment+'/'+name_experiment+'_prediction.nohup')
 else:
-    print "\n2. Run the prediction on GPU (no nohup)"
-    os.system(run_GPU +' python ./src/retinaNN_predict.py')
+    print("\n2. Run the prediction on GPU (no nohup)")
+    os.system(run_GPU + f' python ./src/retinaNN_predict.py --config {args.config}')

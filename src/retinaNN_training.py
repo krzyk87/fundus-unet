@@ -8,16 +8,26 @@
 ##################################################
 
 
-import numpy as np
-import ConfigParser
+import argparse
+import configparser
+import datetime
+#import keras
+#import tensorflow.keras as keras
 
-from keras.models import Model
-from keras.layers import Input, concatenate, Conv2D, MaxPooling2D, UpSampling2D, Reshape, core, Dropout
-from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras import backend as K
-from keras.utils.vis_utils import plot_model as plot
-from keras.optimizers import SGD
+import numpy as np
+import pydot as pyd
+import tensorflow as tf
+
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, concatenate, Conv2D, MaxPooling2D, UpSampling2D, Reshape, Dropout, Permute, Activation
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler, TensorBoard
+from tensorflow.keras import backend as K
+# from tensorflow.keras.utils.vis_utils import plot_model as plot
+from tensorflow.keras.optimizers import SGD
+# from tensorflow.keras.utils.vis_utils import model_to_dot
+# keras.utils.vis_utils.pydot = pyd
+
 
 import sys
 sys.path.insert(0, './lib/')
@@ -28,40 +38,46 @@ from extract_patches import get_data_training
 
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', type=str, required=True)
+args = parser.parse_args()
+
+
+
 #Define the neural network
 def get_unet(n_ch,patch_height,patch_width):
-    inputs = Input(shape=(n_ch,patch_height,patch_width))
-    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(inputs)
+    inputs = Input(shape=(patch_height,patch_width,n_ch))
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(inputs)
     conv1 = Dropout(0.2)(conv1)
-    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv1)
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv1)
     pool1 = MaxPooling2D((2, 2))(conv1)
     #
-    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(pool1)
+    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(pool1)
     conv2 = Dropout(0.2)(conv2)
-    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv2)
+    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv2)
     pool2 = MaxPooling2D((2, 2))(conv2)
     #
-    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_first')(pool2)
+    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_last')(pool2)
     conv3 = Dropout(0.2)(conv3)
-    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv3)
+    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv3)
 
     up1 = UpSampling2D(size=(2, 2))(conv3)
-    up1 = concatenate([conv2,up1],axis=1)
-    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(up1)
+    up1 = concatenate([conv2,up1],axis=-1)
+    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(up1)
     conv4 = Dropout(0.2)(conv4)
-    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv4)
+    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv4)
     #
     up2 = UpSampling2D(size=(2, 2))(conv4)
-    up2 = concatenate([conv1,up2], axis=1)
-    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(up2)
+    up2 = concatenate([conv1,up2], axis=-1)
+    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(up2)
     conv5 = Dropout(0.2)(conv5)
-    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv5)
+    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv5)
     #
-    conv6 = Conv2D(2, (1, 1), activation='relu',padding='same',data_format='channels_first')(conv5)
-    conv6 = core.Reshape((2,patch_height*patch_width))(conv6)
-    conv6 = core.Permute((2,1))(conv6)
+    conv6 = Conv2D(2, (1, 1), activation='relu',padding='same',data_format='channels_last')(conv5)
+    conv6 = Reshape((2,patch_height*patch_width))(conv6)
+    conv6 = Permute((2,1))(conv6)
     ############
-    conv7 = core.Activation('softmax')(conv6)
+    conv7 = Activation('softmax')(conv6)
 
     model = Model(inputs=inputs, outputs=conv7)
 
@@ -132,8 +148,8 @@ def get_gnet(n_ch,patch_height,patch_width):
     return model
 
 #========= Load settings from Config file
-config = ConfigParser.RawConfigParser()
-config.read('configuration.txt')
+config = configparser.RawConfigParser()
+config.read(args.config)
 #patch to the datasets
 path_data = config.get('data paths', 'path_local')
 #Experiment name
@@ -166,9 +182,9 @@ n_ch = patches_imgs_train.shape[1]
 patch_height = patches_imgs_train.shape[2]
 patch_width = patches_imgs_train.shape[3]
 model = get_unet(n_ch, patch_height, patch_width)  #the U-net model
-print "Check: final output of the network:"
-print model.output_shape
-plot(model, to_file='./'+name_experiment+'/'+name_experiment + '_model.png')   #check how the model looks like
+print("Check: final output of the network:")
+print(model.output_shape)
+#plot(model, to_file='./'+name_experiment+'/'+name_experiment + '_model.png')   #check how the model looks like
 json_string = model.to_json()
 open('./'+name_experiment+'/'+name_experiment +'_architecture.json', 'w').write(json_string)
 
@@ -177,6 +193,8 @@ open('./'+name_experiment+'/'+name_experiment +'_architecture.json', 'w').write(
 #============  Training ==================================
 checkpointer = ModelCheckpoint(filepath='./'+name_experiment+'/'+name_experiment +'_best_weights.h5', verbose=1, monitor='val_loss', mode='auto', save_best_only=True) #save at each epoch if the validation decreased
 
+log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
 
 # def step_decay(epoch):
 #     lrate = 0.01 #the initial learning rate (by default in keras)
@@ -188,7 +206,12 @@ checkpointer = ModelCheckpoint(filepath='./'+name_experiment+'/'+name_experiment
 # lrate_drop = LearningRateScheduler(step_decay)
 
 patches_masks_train = masks_Unet(patches_masks_train)  #reduce memory consumption
-model.fit(patches_imgs_train, patches_masks_train, nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer])
+
+
+patches_imgs_train = patches_imgs_train.transpose((0,2,3,1))
+
+
+model.fit(patches_imgs_train, patches_masks_train, epochs=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer, tensorboard_callback])
 
 
 #========== Save and test the last model ===================
