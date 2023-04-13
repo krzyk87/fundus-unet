@@ -18,7 +18,8 @@ def get_data_training(DRIVE_train_imgs_original,
                       patch_height,
                       patch_width,
                       N_subimgs,
-                      inside_FOV):
+                      inside_FOV,
+                      crop_train_img):
     train_imgs_original = load_hdf5(DRIVE_train_imgs_original)
     train_masks = load_hdf5(DRIVE_train_groudTruth) #masks always the same
     # visualize(group_images(train_imgs_original[0:20,:,:,:],5),'imgs_train')#.show()  #check original imgs train
@@ -27,8 +28,9 @@ def get_data_training(DRIVE_train_imgs_original,
     train_imgs = my_PreProc(train_imgs_original)
     train_masks = train_masks/255.
 
-    train_imgs = train_imgs[:,:,9:574,:]  #cut bottom and top so now it is 565*565
-    train_masks = train_masks[:,:,9:574,:]  #cut bottom and top so now it is 565*565
+    if crop_train_img:
+        train_imgs = train_imgs[:,:,9:574,:]  #cut bottom and top so now it is 565*565
+        train_masks = train_masks[:,:,9:574,:]  #cut bottom and top so now it is 565*565
     data_consistency_check(train_imgs,train_masks)
 
     #check masks are within 0-1

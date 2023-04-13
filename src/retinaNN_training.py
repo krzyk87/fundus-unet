@@ -11,23 +11,21 @@
 import argparse
 import configparser
 import datetime
-#import keras
-#import tensorflow.keras as keras
+import keras
 
 import numpy as np
 import pydot as pyd
 import tensorflow as tf
 
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, concatenate, Conv2D, MaxPooling2D, UpSampling2D, Reshape, Dropout, Permute, Activation
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler, TensorBoard
-from tensorflow.keras import backend as K
-# from tensorflow.keras.utils.vis_utils import plot_model as plot
-from tensorflow.keras.optimizers import SGD
-# from tensorflow.keras.utils.vis_utils import model_to_dot
-# keras.utils.vis_utils.pydot = pyd
-
+from keras.models import Model
+from keras.layers import Input, concatenate, Conv2D, MaxPooling2D, UpSampling2D, Reshape, core, Dropout
+from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler, TensorBoard
+from keras import backend as K
+from keras.utils.vis_utils import plot_model as plot
+from keras.optimizers import SGD
+from keras.utils.vis_utils import model_to_dot
+keras.utils.vis_utils.pydot = pyd
 
 import sys
 sys.path.insert(0, './lib/')
@@ -42,47 +40,86 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str, required=True)
 args = parser.parse_args()
 
+class AccuracyLastChanel_layer_keras(tf.keras.metrics.Metric):
+  def __init__(self, name='Accuracy_last_chanel_layer_keras', **kwargs):
+    super(AccuracyLastChanel_layer_keras, self).__init__(name=name, **kwargs)
+    self.my_metric = self.add_weight(name='Accuracy_last_chanel', initializer='zeros')
+    self.m = tf.keras.metrics.Accuracy()
 
+  def update_state(self, y_true, y_pred, sample_weight=None):
+    y_true=tf.where(y_true>=0.5, tf.math.ceil(y_true), tf.math.floor(y_true))
+    y_pred=tf.where(y_pred>=0.5, tf.math.ceil(y_pred), tf.math.floor(y_pred))
+    _ = self.m.update_state(y_true[:,:,1], y_pred[:,:,1])
+    self.my_metric.assign(self.m.result())
+    
+  def result(self):
+    return self.my_metric
+
+  def reset_states(self):
+    self.my_metric.assign(0.)
+    
+class AccuracyLastChanel_layer(tf.keras.metrics.Metric):
+  def __init__(self, name='Accuracy_last_chanel_layer', **kwargs):
+    super(AccuracyLastChanel_layer, self).__init__(name=name, **kwargs)
+    self.my_metric = self.add_weight(name='Accuracy_last_chanel', initializer='zeros')
+
+  def update_state(self, y_true, y_pred, sample_weight=None):
+    y_true=tf.where(y_true>=0.5, tf.math.ceil(y_true), tf.math.floor(y_true))
+    y_pred=tf.where(y_pred>=0.5, tf.math.ceil(y_pred), tf.math.floor(y_pred))
+
+    y_true = y_true[:,:,1]
+    y_pred = y_pred[:,:,1]
+    compare = tf.equal(y_true, y_pred)
+    sum = tf.reduce_sum(tf.cast(compare, tf.float32))
+    sampels = tf.cast(tf.size(y_true), tf.float32)
+    acc = tf.divide(sum, sampels)
+    self.my_metric.assign(acc)
+    
+  def result(self):
+    return self.my_metric
+
+  def reset_state(self):
+    self.my_metric.assign(0.)
 
 #Define the neural network
 def get_unet(n_ch,patch_height,patch_width):
-    inputs = Input(shape=(patch_height,patch_width,n_ch))
-    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(inputs)
+    inputs = Input(shape=(n_ch,patch_height,patch_width))
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(inputs)
     conv1 = Dropout(0.2)(conv1)
-    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv1)
+    conv1 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv1)
     pool1 = MaxPooling2D((2, 2))(conv1)
     #
-    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(pool1)
+    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(pool1)
     conv2 = Dropout(0.2)(conv2)
-    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv2)
+    conv2 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv2)
     pool2 = MaxPooling2D((2, 2))(conv2)
     #
-    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_last')(pool2)
+    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_first')(pool2)
     conv3 = Dropout(0.2)(conv3)
-    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv3)
+    conv3 = Conv2D(128, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv3)
 
     up1 = UpSampling2D(size=(2, 2))(conv3)
-    up1 = concatenate([conv2,up1],axis=-1)
-    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(up1)
+    up1 = concatenate([conv2,up1],axis=1)
+    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(up1)
     conv4 = Dropout(0.2)(conv4)
-    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv4)
+    conv4 = Conv2D(64, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv4)
     #
     up2 = UpSampling2D(size=(2, 2))(conv4)
-    up2 = concatenate([conv1,up2], axis=-1)
-    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(up2)
+    up2 = concatenate([conv1,up2], axis=1)
+    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(up2)
     conv5 = Dropout(0.2)(conv5)
-    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_last')(conv5)
+    conv5 = Conv2D(32, (3, 3), activation='relu', padding='same',data_format='channels_first')(conv5)
     #
-    conv6 = Conv2D(2, (1, 1), activation='relu',padding='same',data_format='channels_last')(conv5)
-    conv6 = Reshape((2,patch_height*patch_width))(conv6)
-    conv6 = Permute((2,1))(conv6)
+    conv6 = Conv2D(2, (1, 1), activation='relu',padding='same',data_format='channels_first')(conv5)
+    conv6 = core.Reshape((2,patch_height*patch_width))(conv6)
+    conv6 = core.Permute((2,1))(conv6)
     ############
-    conv7 = Activation('softmax')(conv6)
+    conv7 = core.Activation('softmax')(conv6)
 
     model = Model(inputs=inputs, outputs=conv7)
 
     # sgd = SGD(lr=0.01, decay=1e-6, momentum=0.3, nesterov=False)
-    model.compile(optimizer='sgd', loss='categorical_crossentropy',metrics=['accuracy'])
+    model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy', AccuracyLastChanel_layer(), AccuracyLastChanel_layer_keras()])
 
     return model
 
@@ -167,7 +204,8 @@ patches_imgs_train, patches_masks_train = get_data_training(
     patch_height = int(config.get('data attributes', 'patch_height')),
     patch_width = int(config.get('data attributes', 'patch_width')),
     N_subimgs = int(config.get('training settings', 'N_subimgs')),
-    inside_FOV = config.getboolean('training settings', 'inside_FOV') #select the patches only inside the FOV  (default == True)
+    inside_FOV = config.getboolean('training settings', 'inside_FOV'), #select the patches only inside the FOV  (default == True)
+    crop_train_img = False
 )
 
 
@@ -206,12 +244,7 @@ tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
 # lrate_drop = LearningRateScheduler(step_decay)
 
 patches_masks_train = masks_Unet(patches_masks_train)  #reduce memory consumption
-
-
-patches_imgs_train = patches_imgs_train.transpose((0,2,3,1))
-
-
-model.fit(patches_imgs_train, patches_masks_train, epochs=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer, tensorboard_callback])
+model.fit(patches_imgs_train, patches_masks_train, nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer, tensorboard_callback])
 
 
 #========== Save and test the last model ===================

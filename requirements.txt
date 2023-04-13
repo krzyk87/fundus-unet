@@ -1,0 +1,10 @@
+configparser
+h5py
+keras==2.3.0
+matplotlib
+opencv-python
+scikit-learn==0.22.1
+tensorflow==1.15.5
+protobuf==3.20.0
+pydot
+graphviz

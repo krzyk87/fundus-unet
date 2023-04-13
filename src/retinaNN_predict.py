@@ -12,10 +12,10 @@ import argparse
 import configparser
 from matplotlib import pyplot as plt
 #Keras
-from tensorflow.keras.models import model_from_json
-from tensorflow.keras.models import Model
-import tensorflow.keras.backend as K
-K.set_image_data_format('channels_last')
+from keras.models import model_from_json
+from keras.models import Model
+import keras.backend as K
+K.set_image_dim_ordering('th')
 #scikit learn
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
@@ -113,9 +113,6 @@ else:
         patch_width = patch_width,
     )
 
-
-
-patches_imgs_test = patches_imgs_test.transpose((0,2,3,1))
 
 
 #================ Run the prediction of the patches ==================================
