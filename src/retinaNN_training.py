@@ -232,7 +232,7 @@ open('./'+name_experiment+'/'+name_experiment +'_architecture.json', 'w').write(
 checkpointer = ModelCheckpoint(filepath='./'+name_experiment+'/'+name_experiment +'_best_weights.h5', verbose=1, monitor='val_loss', mode='auto', save_best_only=True) #save at each epoch if the validation decreased
 
 log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=0)
 
 # def step_decay(epoch):
 #     lrate = 0.01 #the initial learning rate (by default in keras)
@@ -245,6 +245,8 @@ tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
 
 patches_masks_train = masks_Unet(patches_masks_train)  #reduce memory consumption
 model.fit(patches_imgs_train, patches_masks_train, nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer, tensorboard_callback])
+# modified params for keras 2.12.0
+# model.fit(patches_imgs_train, patches_masks_train, epochs=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer, tensorboard_callback])
 
 
 #========== Save and test the last model ===================
