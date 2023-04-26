@@ -205,7 +205,7 @@ patches_imgs_train, patches_masks_train = get_data_training(
     patch_width = int(config.get('data attributes', 'patch_width')),
     N_subimgs = int(config.get('training settings', 'N_subimgs')),
     inside_FOV = config.getboolean('training settings', 'inside_FOV'), #select the patches only inside the FOV  (default == True)
-    crop_train_img = False
+    crop_train_img = True
 )
 
 
@@ -245,8 +245,6 @@ tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=0)
 
 patches_masks_train = masks_Unet(patches_masks_train)  #reduce memory consumption
 model.fit(patches_imgs_train, patches_masks_train, nb_epoch=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer, tensorboard_callback])
-# modified params for keras 2.12.0
-# model.fit(patches_imgs_train, patches_masks_train, epochs=N_epochs, batch_size=batch_size, verbose=2, shuffle=True, validation_split=0.1, callbacks=[checkpointer, tensorboard_callback])
 
 
 #========== Save and test the last model ===================

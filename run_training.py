@@ -34,11 +34,11 @@ elif sys.platform=='win32':
 else:
     os.system('mkdir -p ' +result_dir)
 
-print("copy the configuration file in the results folder")
-if sys.platform=='win32':
-    os.system('copy configuration.txt .\\' +name_experiment+'\\'+name_experiment+'_configuration.txt')
-else:
-    os.system('cp configuration.txt ./' +name_experiment+'/'+name_experiment+'_configuration.txt')
+# print("copy the configuration file in the results folder")
+# if sys.platform=='win32':
+#     os.system('copy configuration.txt .\\' +name_experiment+'\\'+name_experiment+'_configuration.txt')
+# else:
+#     os.system('cp configuration.txt ./' +name_experiment+'/'+name_experiment+'_configuration.txt')
 
 # run the experiment
 if nohup:

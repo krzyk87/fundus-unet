@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 from keras.models import model_from_json
 from keras.models import Model
 import keras.backend as K
-K.set_image_dim_ordering('th')
+K.set_image_data_format('channels_first')   # K.set_image_dim_ordering('th')
 #scikit learn
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
